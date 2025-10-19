@@ -1,0 +1,27 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.env
+
+# Node / React
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.vite
+
+# IDE / OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Data files
+*.csv
+*.xlsx
+*.zip
+
+# Logs
+*.log
