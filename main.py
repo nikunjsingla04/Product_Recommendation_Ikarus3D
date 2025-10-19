@@ -1,4 +1,3 @@
-# backend/main.py
 import os
 import re
 import numpy as np
@@ -9,7 +8,6 @@ from typing import List, Optional
 import uvicorn
 import logging
 
-# --- LangChain embeddings wrapper (lightweight usage to satisfy integration requirement) ---
 # If langchain is not installed, we fall back to SentenceTransformer directly.
 try:
     from langchain.embeddings import SentenceTransformerEmbeddings
@@ -17,7 +15,6 @@ try:
 except Exception:
     LANGCHAIN_AVAILABLE = False
 
-# Use sentence-transformers directly as a fallback (and for batch work)
 from sentence_transformers import SentenceTransformer
 
 LOG = logging.getLogger("uvicorn.error")
@@ -32,7 +29,6 @@ TITLE_EMB_PATH = os.path.join(OUT_DIR, "embeddings_title.npy")
 if not os.path.exists(EMB_PATH) or not os.path.exists(META_PATH):
     raise RuntimeError("Missing embeddings_data. Run preprocess_and_embed.py first and ensure embeddings_data/ exists.")
 
-# load metadata and embeddings
 embs = np.load(EMB_PATH).astype("float32")
 meta = pd.read_csv(META_PATH).fillna("")
 
@@ -44,7 +40,6 @@ if os.path.exists(TITLE_EMB_PATH):
 else:
     emb_title = None
 
-# normalize text embeddings
 def normalize_rows(x: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(x, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
@@ -52,7 +47,6 @@ def normalize_rows(x: np.ndarray) -> np.ndarray:
 
 embs = normalize_rows(embs)
 
-# parse price helper
 def parse_price(value):
     if pd.isna(value) or value is None: return None
     if isinstance(value, (int, float)) and not np.isnan(value): return float(value)
@@ -67,8 +61,6 @@ def parse_price(value):
 if "price_num" not in meta.columns:
     meta["price_num"] = meta["price"].apply(parse_price)
 
-# Load query embedding generator
-# Prefer LangChain wrapper if available (satisfies integration requirement)
 if LANGCHAIN_AVAILABLE:
     try:
         lc_embedder = SentenceTransformerEmbeddings(model_name=MODEL_NAME)
@@ -79,25 +71,22 @@ if LANGCHAIN_AVAILABLE:
 else:
     lc_embedder = None
 
-# fallback direct model
 model = SentenceTransformer(MODEL_NAME)
 
 def embed_query_text(q: str) -> np.ndarray:
     q = q or ""
     if LANGCHAIN_AVAILABLE and lc_embedder is not None:
         try:
-            vec = lc_embedder.embed_query(q)  # returns list[float]
+            vec = lc_embedder.embed_query(q)
             arr = np.asarray(vec, dtype=np.float32)
             arr = arr / (np.linalg.norm(arr) + 1e-12)
             return arr
         except Exception as e:
             LOG.warning("LangChain embed_query failed, fallback: %s", e)
-    # fallback
     vec = model.encode([q], convert_to_numpy=True)[0]
     vec = vec / (np.linalg.norm(vec) + 1e-12)
     return vec.astype("float32")
 
-# query expansion (same as your earlier helper)
 def expand_query_text(q: str) -> str:
     if not q:
         return q
@@ -132,10 +121,8 @@ def expand_query_text(q: str) -> str:
         return q + " " + " ".join(expansions)
     return q
 
-# FastAPI app
 app = FastAPI(title="MVP Recommender (FastAPI)")
 
-# CORS for frontend dev
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
@@ -173,9 +160,7 @@ def recommend(req: RecommendReq):
     except Exception:
         q_proc = q
 
-    # compute query embedding via LangChain (if available) or direct model
-    q_emb = embed_query_text(q_proc)  # 1D vector
-    # candidate mask
+    q_emb = embed_query_text(q_proc)
     mask = pd.Series(True, index=meta.index)
     if cat:
         mask = mask & meta["categories"].astype(str).str.lower().str.contains(str(cat).lower())
@@ -188,7 +173,6 @@ def recommend(req: RecommendReq):
     if cand_idxs.size == 0:
         return []
 
-    # compute similarities
     sims_text = np.dot(embs[cand_idxs], q_emb)
     if emb_title is not None:
         sims_title = np.dot(emb_title[cand_idxs], q_emb)
@@ -197,7 +181,6 @@ def recommend(req: RecommendReq):
     else:
         sims_all = sims_text
 
-    # basic token boosts (kept small)
     tokens = [t.lower() for t in re.split(r"\W+", q_proc) if t and len(t) > 2]
     token_boost_map = {"lamp":0.16, "light":0.14, "dimmer":0.18, "sofa":0.10, "chair":0.10, "ottoman":0.10}
     important_tokens = set(token_boost_map.keys())
@@ -215,7 +198,6 @@ def recommend(req: RecommendReq):
         boosts[i_local] = float(boost_val)
     sims_boosted = sims_all + boosts
 
-    # overlap boost
     overlap_boosts = np.zeros_like(sims_all, dtype=float)
     for i_local, idx_global in enumerate(cand_idxs):
         row = meta.iloc[int(idx_global)]
@@ -225,7 +207,6 @@ def recommend(req: RecommendReq):
             overlap_boosts[i_local] = 0.12 * overlap_count
     sims_boosted = sims_boosted + overlap_boosts
 
-    # take top candidates then final top-k
     top_n = min(len(cand_idxs), max(50, k*10))
     order_all = np.argsort(-sims_boosted)[:top_n]
     selected_idxs = cand_idxs[order_all]
@@ -235,7 +216,6 @@ def recommend(req: RecommendReq):
     final_idxs = selected_idxs[top_k_pos]
     final_scores = selected_scores[top_k_pos]
 
-    # fallback substring search if top score very low
     if len(final_scores) == 0 or float(final_scores[0]) < 0.15:
         mask_kw = pd.Series(False, index=meta.index)
         for t in tokens:
@@ -286,7 +266,6 @@ def recommend(req: RecommendReq):
         ))
     return out
 
-# ----------------- generate description endpoint -----------------
 class GenReq(BaseModel):
     uniq_id: str
     use_llm: Optional[bool] = False
@@ -306,7 +285,6 @@ def generate_description(req: GenReq):
     cats = str(row.get("categories","")).strip()
     orig_desc = str(row.get("description","")).strip()
 
-    # If transformers pipeline exists and user requested use_llm, use it (best-effort)
     if req.use_llm:
         try:
             from transformers import pipeline
@@ -318,7 +296,6 @@ def generate_description(req: GenReq):
         except Exception as e:
             LOG.error("LLM generation failed: %s", e)
 
-    # deterministic template fallback (fast & safe)
     parts = []
     if title: parts.append(title)
     if brand: parts.append(f"by {brand}")
@@ -336,12 +313,9 @@ def generate_description(req: GenReq):
         templ = templ + "."
     return {"uniq_id": uid, "creative_description": templ}
 
-# ----------------- analytics endpoint -----------------
 @app.get("/analytics")
 def analytics():
-    # basic stats for frontend charts
     cats = meta["categories"].fillna("").astype(str)
-    # flatten categories by splitting on comma and counting tokens
     cat_counts = {}
     for s in cats:
         if not s: continue
@@ -356,7 +330,6 @@ def analytics():
                    "max": float(price_nums.max()) if not price_nums.empty else None,
                    "mean": float(price_nums.mean()) if not price_nums.empty else None}
 
-    # top colors/materials
     color_counts = meta["color"].fillna("").astype(str).str.strip().value_counts().to_dict()
     material_counts = meta["material"].fillna("").astype(str).str.strip().value_counts().to_dict()
 
