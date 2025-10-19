@@ -1,4 +1,3 @@
-# eval_precision.py
 import requests, json, math, random, sys, os
 import pandas as pd
 from collections import defaultdict
@@ -6,7 +5,6 @@ from collections import defaultdict
 URL = "http://127.0.0.1:8000/recommend"
 META = "embeddings_data/metadata.csv"
 
-# coarse label mapping - same logic as notebook
 def map_to_coarse(catstr):
     s = str(catstr).lower()
     if any(x in s for x in ["sofa","couch","loveseat","sectional"]):
