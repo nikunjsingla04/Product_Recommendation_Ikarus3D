@@ -294,13 +294,14 @@ def generate_description(req: GenReq):
     # Using template-based fallback instead.
 
     if req.use_llm and GENAI_PIPELINE:
-    try:
-        prompt = f"Write a short, engaging product description in 1-2 sentences:\nTitle: {title}\nBrand: {brand}\nMaterial: {material}\nColor: {color}\nCategories: {cats}\nExisting: {orig_desc}\n"
-        outp = GENAI_PIPELINE(prompt, max_length=120, do_sample=False)
-        text = outp[0]["generated_text"] if isinstance(outp, list) else str(outp)
-        return {"uniq_id": uid, "creative_description": text}
-    except Exception as e:
-        LOG.error("LLM generation failed: %s", e)
+        try:
+            prompt = f"Write a short, engaging product description in 1-2 sentences:\nTitle: {title}\nBrand: {brand}\nMaterial: {material}\nColor: {color}\nCategories: {cats}\nExisting: {orig_desc}\n"
+            outp = GENAI_PIPELINE(prompt, max_length=120, do_sample=False)
+            text = outp[0]["generated_text"] if isinstance(outp, list) else str(outp)
+            return {"uniq_id": uid, "creative_description": text}
+        except Exception as e:
+            LOG.error("LLM generation failed: %s", e)
+
 
 
     parts = []
