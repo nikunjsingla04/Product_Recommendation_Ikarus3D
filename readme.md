@@ -52,7 +52,7 @@ pip install -r requirements.txt
 3. Start the FastAPI server:
 
 ```bash
-python backend/main.py
+python main.py
 ```
 
 Server runs at: `http://127.0.0.1:8000`
