@@ -1,10 +1,8 @@
-# eval_queries.py
 import requests
 import json
 
 URL = "http://127.0.0.1:8000/recommend"
 
-# list of (query, expected_keywords) pairs
 cases = [
     ("grey two-seater sofa", ["sofa","couch","loveseat","sectional"]),
     ("comfortable two seater sofa", ["sofa","couch","loveseat","sectional"]),
