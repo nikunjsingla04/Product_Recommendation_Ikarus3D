@@ -1,8 +1,3 @@
-# ================= DISABLED FOR RENDER =================
-# Flan-T5 is disabled due to Render free plan memory limit (512MB)
-# Alternative: Using template-based fallback in /generate-description endpoint
-GENAI_PIPELINE = None
-# ========================================================
 import os
 import re
 import numpy as np
@@ -290,19 +285,16 @@ def generate_description(req: GenReq):
     cats = str(row.get("categories","")).strip()
     orig_desc = str(row.get("description","")).strip()
     
-    # Note: LLM is disabled on Render free plan to avoid memory errors.
-    # Using template-based fallback instead.
-
-    if req.use_llm and GENAI_PIPELINE:
-        try:
-            prompt = f"Write a short, engaging product description in 1-2 sentences:\nTitle: {title}\nBrand: {brand}\nMaterial: {material}\nColor: {color}\nCategories: {cats}\nExisting: {orig_desc}\n"
-            outp = GENAI_PIPELINE(prompt, max_length=120, do_sample=False)
-            text = outp[0]["generated_text"] if isinstance(outp, list) else str(outp)
-            return {"uniq_id": uid, "creative_description": text}
-        except Exception as e:
-            LOG.error("LLM generation failed: %s", e)
-
-
+    if req.use_llm:
+         try:
+            from transformers import pipeline
+            gen = pipeline("text2text-generation", model="google/flan-t5-small", device=-1) 
+            prompt = f"Write a short, engaging product description in 1-2 sentences:\nTitle: {title}\nBrand: {brand}\nMaterial: {material}\nColor: {color}\nCategories: {cats}\nExisting: {orig_desc}\n" 
+            outp = gen(prompt, max_length=120, do_sample=False) 
+            text = outp[0]["generated_text"] if isinstance(outp, list) else str(outp) 
+            return {"uniq_id": uid, "creative_description": text} 
+         except Exception as e: 
+             LOG.error("LLM generation failed: %s", e)
 
     parts = []
     if title: parts.append(title)
