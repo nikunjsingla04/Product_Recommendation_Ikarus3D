@@ -19,7 +19,6 @@ frontend/.vite
 Thumbs.db
 
 # Data files
-*.csv
 *.xlsx
 *.zip
 
