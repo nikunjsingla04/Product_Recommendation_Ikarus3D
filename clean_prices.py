@@ -1,4 +1,3 @@
-# clean_prices.py
 import pandas as pd, re, numpy as np
 p = "embeddings_data/metadata.csv"
 df = pd.read_csv(p)
